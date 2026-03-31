@@ -1,6 +1,7 @@
 import torch
 import os
 from diffusers import StableDiffusionXLPipeline
+import argparse
 
 def test_lora_sdxl(
     model_id = "SG161222/RealVisXL_V4.0",
