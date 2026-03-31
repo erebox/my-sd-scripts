@@ -83,4 +83,4 @@ def prepara_dataset(
     }
 
 if __name__ == '__main__':
-    prepara_dataset(src_mode="pc")
+    prepara_dataset(src_mode="drive", drive_subpath="lora/dataset/sarmod2")
