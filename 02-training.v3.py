@@ -23,7 +23,7 @@ def train_lora_sdxl(
     resolution=512,
     device="cuda",
     dtype=torch.bfloat16,
-    lora_r=8,
+    lora_r=4,
     lora_alpha=16,
     lora_dropout=0.05,
     default_caption="a photo of subject",
@@ -85,9 +85,28 @@ def train_lora_sdxl(
         noise = torch.randn_like(latents)
         timesteps = torch.randint(0, noise_scheduler.config.num_train_timesteps, (latents.shape[0],), device=device).long()
         noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
-        added_cond_kwargs = {"text_embeds": pooled_embeds}
 
-        noise_pred = unet(noisy_latents, timesteps, text_embeds, added_cond_kwargs=added_cond_kwargs).sample
+        original_size = (resolution, resolution)
+        target_size = (resolution, resolution)
+        crops_coords_top_left = (0, 0)
+
+        time_ids = torch.tensor(
+            list(original_size + crops_coords_top_left + target_size),
+            device=noisy_latents.device,
+            dtype=pooled_embeds.dtype
+        ).unsqueeze(0).repeat(noisy_latents.shape[0], 1)
+
+        added_cond_kwargs = {
+            "text_embeds": pooled_embeds,
+            "time_ids": time_ids
+        }
+
+        noise_pred = unet(
+            noisy_latents,
+            timesteps,
+            encoder_hidden_states=text_embeds,
+            added_cond_kwargs=added_cond_kwargs
+        ).sample
         loss = F.mse_loss(noise_pred.float(), noise.float())
         loss.backward()
         optimizer.step()
@@ -128,9 +147,9 @@ def train_lora_sdxl(
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description="Addestra LoRA su SDXL con early stopping")
-    parser.add_argument("--dataset_path", type=str, default="./training_data")
-    parser.add_argument("--output_path", type=str, default="./lora_output")
+    parser = argparse.ArgumentParser(description="Prepara un dataset di immagini con caption")
+    parser.add_argument("--dataset_path", type=str, default="/content/training_data/soggetto", help="Cartella dove salvare le immagini preprocessate")
+    parser.add_argument("--output_path", type=str, default="/content/lora_output", help="Cartella dove salvare i file di output")
     args = parser.parse_args()
 
     train_lora_sdxl(
@@ -138,7 +157,7 @@ if __name__ == '__main__':
         dataset_path=args.dataset_path,
         output_path=args.output_path,
         steps=1000,
-        lr=1e-4,
+        lr=5e-5,
         batch_size=1,
         resolution=512,
         default_caption="a photo of subject",
