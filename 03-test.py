@@ -5,7 +5,7 @@ from diffusers import StableDiffusionXLPipeline
 def test_lora_sdxl(
     model_id = "SG161222/RealVisXL_V4.0",
     lora_path = "./lora_output/lora_step200.safetensors",  # cambia per ogni test
-    output_dir = "./test_output"
+    output_dir = "./test_output",
     subject_name = "subject"
 ):
     os.makedirs(output_dir, exist_ok=True)
