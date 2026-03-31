@@ -17,8 +17,9 @@ def test_lora_sdxl(
         use_safetensors=True
     ).to("cuda")
 
-    pipe.unet.load_attn_procs(lora_path)
-
+    #pipe.unet.load_attn_procs(lora_path)
+    pipe.unet.load_lora_adapter(lora_path)
+    
     # opzionale: forza LoRA (se troppo debole)
     # pipe.unet.set_attn_processor_scale(1.2)
 
