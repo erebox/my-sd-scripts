@@ -9,7 +9,7 @@ from diffusers import StableDiffusionXLPipeline
 from diffusers.optimization import get_scheduler
 from peft import LoraConfig, get_peft_model
 from safetensors.torch import save_file
-
+import argparse
 
 class LoraDataset(Dataset):
     def __init__(self, folder, tokenizer1, tokenizer2, size=512, default_caption="a photo"):
@@ -193,11 +193,15 @@ def train_lora_sdxl(
     print(f"File finale: {final_path}")
 
 if __name__ == '__main__':
-
+    parser = argparse.ArgumentParser(description="Prepara un dataset di immagini con caption")
+    parser.add_argument("--dataset_path", type=str, default="/content/training_data/soggetto", help="Cartella dove salvare le immagini preprocessate")
+    parser.add_argument("--output_path", type=str, default="/content/lora_output", help="Cartella dove salvare i file di output")
+    
+    args = parser.parse_args()
     train_lora_sdxl(
         model_id="SG161222/RealVisXL_V4.0",
-        dataset_path="/content/training_data/soggetto",
-        output_path="/content/lora_output",
+        dataset_path=args.dataset_path,
+        output_path=args.output_path,
         steps=3000, lr=0.0002, batch_size=1, resolution=512,
         default_caption="a photo of model"
     )

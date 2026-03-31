@@ -1,54 +1,28 @@
-from google.colab import files, drive
 import os
 import torch
 from PIL import Image
+import argparse
 
 def prepara_dataset(
-    src_mode="pc",  # "pc" oppure "drive"
-    drive_subpath=None,  # es: "lora/dataset/soggetto"
     upload_path="/content/training_data/upload",
     dest_path="/content/training_data/soggetto",
     image_size=512
 ):
-    print(f"GPU: {torch.cuda.get_device_name(0)}")
-    print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory/1024**3:.1f} GB")
+    if torch.cuda.is_available():
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+        print(f"VRAM: {torch.cuda.get_device_properties(0).total_memory/1024**3:.1f} GB")
+    else:
+        print("GPU non disponibile, uso CPU")
     print(f"PyTorch: {torch.__version__}")
     print("Ambiente pronto!")
 
     os.makedirs(upload_path, exist_ok=True)
     os.makedirs(dest_path, exist_ok=True)
 
-    if src_mode == "drive":
-        if not drive_subpath:
-            raise ValueError("Devi specificare drive_subpath se src_mode='drive'")
-        drive.mount('/content/drive')
-        drive_path = f"/content/drive/MyDrive/{drive_subpath.strip('/')}"
-        if not os.path.exists(drive_path):
-            raise ValueError("Percorso Google Drive non valido")
-        count = 0
-        for filename in os.listdir(drive_path):
-            src_file = os.path.join(drive_path, filename)
-            dst_file = os.path.join(upload_path, filename)
-            if os.path.isfile(src_file):
-                with open(src_file, "rb") as f_src, open(dst_file, "wb") as f_dst:
-                    f_dst.write(f_src.read())
-                count += 1
-        print(f"Copiati {count} file da Google Drive")
-    elif src_mode == "pc":
-        print("Carica tutte le foto JPG/PNG e il file captions.txt")
-        uploaded = files.upload()
-
-        for filename in uploaded.keys():
-            with open(os.path.join(upload_path, filename), "wb") as f:
-                f.write(uploaded[filename])
-
-        print(f"Caricati {len(uploaded)} file")
-    else:
-        raise ValueError("src_mode deve essere 'pc' o 'drive'")
-
     captions_file = os.path.join(upload_path, "captions.txt")
     if not os.path.exists(captions_file):
         raise FileNotFoundError("captions.txt non trovato")
+    
     captions = {}
     with open(captions_file, "r") as f:
         for line in f:
@@ -61,17 +35,26 @@ def prepara_dataset(
     foto = [f for f in os.listdir(upload_path) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
     for nome in foto:
         img_path = os.path.join(upload_path, nome)
-        img = Image.open(img_path).convert("RGB")
+
+        try:
+            img = Image.open(img_path).convert("RGB")
+        except Exception as e:
+            print(f"Errore su {nome}: {e}")
+            continue
+
         w, h = img.size
         lato = min(w, h)
         img = img.crop(((w - lato)//2, (h - lato)//2, (w + lato)//2, (h + lato)//2))
         img = img.resize((image_size, image_size), Image.LANCZOS)
-        img.save(os.path.join(dest_path, nome), quality=95)
+
         base_name = os.path.splitext(nome)[0]
-        caption = (captions.get(nome) or captions.get(nome.lower()) or captions.get(base_name) or captions.get(base_name.lower()))
+        out_img = os.path.join(dest_path, base_name + ".jpg")
+        img.save(out_img, quality=95)
+
+        caption = captions.get(nome.lower()) or captions.get(base_name.lower())
+
         if caption:
-            txt_name = base_name  + ".txt"
-            with open(os.path.join(dest_path, txt_name), "w", encoding="utf-8") as f:
+            with open(os.path.join(dest_path, base_name  + ".txt"), "w", encoding="utf-8") as f:
                 f.write(caption)
         else:
             print(f"Nessuna caption per: {nome}")
@@ -83,4 +66,10 @@ def prepara_dataset(
     }
 
 if __name__ == '__main__':
-    prepara_dataset(src_mode="drive", drive_subpath="lora/dataset/sarmod2")
+    parser = argparse.ArgumentParser(description="Prepara un dataset di immagini con caption")
+    parser.add_argument("--upload_path", type=str, default="/content/training_data/upload", help="Cartella con le immagini originali e captions.txt")
+    parser.add_argument("--dest_path", type=str, default="/content/training_data/soggetto", help="Cartella dove salvare le immagini preprocessate")
+    parser.add_argument("--image_size", type=int, default=512, help="Dimensione finale delle immagini (quadrato)")
+    
+    args = parser.parse_args()
+    prepara_dataset(args.upload_path, args.dest_path, args.image_size)
